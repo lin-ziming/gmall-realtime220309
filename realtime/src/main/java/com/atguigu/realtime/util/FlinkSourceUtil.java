@@ -17,7 +17,10 @@ public class FlinkSourceUtil {
     
         Properties props = new Properties();
         props.setProperty("bootstrap.servers", Constant.KAFKA_BROKERS);
+        
         props.setProperty("isolation.level", "read_committed");
+        props.setProperty("group.id", groupId);
+        props.setProperty("auto.offset.reset", "latest");
         
         
         return new FlinkKafkaConsumer<String>(topic, new SimpleStringSchema(), props);
