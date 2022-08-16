@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<!--
+/**
+ *
+ * Licensed to the Apache Software Foundation (ASF) under one
+ * or more contributor license agreements.  See the NOTICE file
+ * distributed with this work for additional information
+ * regarding copyright ownership.  The ASF licenses this file
+ * to you under the Apache License, Version 2.0 (the
+ * "License"); you may not use this file except in compliance
+ * with the License.  You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+-->
+<configuration>
+    <property>
+        <name>hbase.rootdir</name>
+        <value>hdfs://hadoop162:8020/hbase</value>
+    </property>
+
+    <property>
+        <name>hbase.cluster.distributed</name>
+        <value>true</value>
+    </property>
+
+    <property>
+        <name>hbase.zookeeper.quorum</name>
+        <value>hadoop162,hadoop163,hadoop164</value>
+    </property>
+
+    <property>
+        <name>hbase.unsafe.stream.capability.enforce</name>
+        <value>false</value>
+    </property>
+    
+    <property>
+        <name>hbase.wal.provider</name>
+        <value>filesystem</value>
+    </property>
+    
+        <!-- phoenix regionserver 配置参数-->
+    <property>
+        <name>hbase.regionserver.wal.codec</name>
+        <value>org.apache.hadoop.hbase.regionserver.wal.IndexedWALEditCodec</value>
+    </property>
+
+    <property>
+        <name>hbase.region.server.rpc.scheduler.factory.class</name>
+        <value>org.apache.hadoop.hbase.ipc.PhoenixRpcSchedulerFactory</value>
+        <description>Factory to create the Phoenix RPC Scheduler that uses separate queues for index and metadata updates</description>
+    </property>
+
+    <property>
+        <name>hbase.rpc.controllerfactory.class</name>
+        <value>org.apache.hadoop.hbase.ipc.controller.ServerRpcControllerFactory</value>
+        <description>Factory to create the Phoenix RPC Scheduler that uses separate queues for index and metadata updates</description>
+    </property>
+
+<!-- 注意：为了开启hbase的namespace和phoenix的schema的映射，在程序中需要加这个配置文件，另外在linux服务上，也需要在hbase以及phoenix的hbase-site.xml配置文件中，加上以上两个配置，并使用xsync进行同步（本节1中文档已有说明）。-->
+<property>
+    <name>phoenix.schema.isNamespaceMappingEnabled</name>
+    <value>true</value>
+</property>
+
+<property>
+    <name>phoenix.schema.mapSystemTablesToNamespace</name>
+    <value>true</value>
+</property>
+
+
+</configuration>
