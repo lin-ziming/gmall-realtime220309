@@ -29,7 +29,7 @@ public class JdbcUtil {
             return DriverManager.getConnection(url, user, password);
         } catch (SQLException e) {
             e.printStackTrace();
-            throw new  RuntimeException("你提供的usr或者user或者password 有误, 请检查:url=" + url + ", user=" + user + ",password=" + password);
+            throw new  RuntimeException("你提供的url或者user或者password 有误, 请检查:url=" + url + ", user=" + user + ",password=" + password);
         }
     
     }
