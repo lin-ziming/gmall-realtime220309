@@ -19,6 +19,7 @@
         <flink.version>1.13.6</flink.version>
         <scala.version>2.11</scala.version>
         <hadoop.version>3.1.3</hadoop.version>
+        <cdc.version>2.2.1</cdc.version>
     </properties>
 
     <dependencies>
@@ -122,6 +123,38 @@
             <artifactId>commons-compress</artifactId>
             <version>1.21</version>
         </dependency>
+
+        <dependency>
+            <groupId>com.ververica</groupId>
+            <artifactId>flink-connector-mysql-cdc</artifactId>
+            <!-- The dependency is available only for stable releases, SNAPSHOT dependency need build by yourself. -->
+            <version>${cdc.version}</version>
+        </dependency>
+
+
+        <!--phoenix相关依赖-->
+        <dependency>
+            <groupId>org.apache.phoenix</groupId>
+            <artifactId>phoenix-core</artifactId>
+            <version>5.0.0-HBase-2.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.glassfish</groupId>
+                    <artifactId>javax.el</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>30.1-jre</version>
+        </dependency>
+        <dependency>
+            <groupId>com.google.protobuf</groupId>
+            <artifactId>protobuf-java</artifactId>
+            <version>2.5.0</version>
+        </dependency>
+        <!--phoenix相关依赖-->
 
 
 
