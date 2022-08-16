@@ -226,12 +226,12 @@ https://github.com/ververica/flink-cdc-connectors
     r2 迁移到163
     
  -----
- 必须分裂和迁移: 预分区
+ 避免分裂和迁移: 预分区
  
  
  --------
  
- Phoenix建表: 如果创建带有预分区的表?
+ Phoenix建表: 如何创建带有预分区的表?
  
  
  
