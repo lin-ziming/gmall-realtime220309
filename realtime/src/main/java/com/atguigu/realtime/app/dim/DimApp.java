@@ -5,10 +5,12 @@ import com.alibaba.fastjson.JSONObject;
 import com.atguigu.realtime.app.BaseAppV1;
 import com.atguigu.realtime.bean.TableProcess;
 import com.atguigu.realtime.common.Constant;
+import com.atguigu.realtime.util.FlinkSinkUtil;
 import com.atguigu.realtime.util.JdbcUtil;
 import com.ververica.cdc.connectors.mysql.source.MySqlSource;
 import com.ververica.cdc.debezium.JsonDebeziumDeserializationSchema;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
@@ -24,6 +26,8 @@ import org.apache.flink.util.Collector;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * @Author lzc
@@ -45,13 +49,53 @@ public class DimApp extends BaseAppV1 {
         SingleOutputStreamOperator<TableProcess> tpStream = readTableProcess(env);
         // 3. 数据流和广播流做connect
         SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> dataTpStream = connect(etledStream, tpStream);
-        dataTpStream.print();
-        // 4. 根据不同的配置信息, 把不同的维度写入到不同的Phoenix的表中
+        // 4. 过滤掉不需要的字段
+        SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> resultStream = filterNotNeedColumns(dataTpStream);
+        
+        // 5. 根据不同的配置信息, 把不同的维度写入到不同的Phoenix的表中
+        writeToPhoenix(resultStream);
+        
         
     }
     
-    private SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> connect(SingleOutputStreamOperator<JSONObject> dataStream,
-                                                                                 SingleOutputStreamOperator<TableProcess> tpStream) {
+    private void writeToPhoenix(SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> stream) {
+        
+        /*
+        phoenix 通过sql语句写
+        jdbc连接器 ?
+            一个流只能写入一张表, 不能使用jdbc sink
+            
+        自定义sink
+        
+         */
+        stream.addSink(FlinkSinkUtil.getPhoenixSink());
+        
+    }
+    
+    private SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> filterNotNeedColumns(
+        SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> dataTpStream) {
+        
+        return dataTpStream
+            .map(new MapFunction<Tuple2<JSONObject, TableProcess>, Tuple2<JSONObject, TableProcess>>() {
+                @Override
+                public Tuple2<JSONObject, TableProcess> map(Tuple2<JSONObject, TableProcess> value) throws Exception {
+                    JSONObject data = value.f0;
+                    List<String> columns = Arrays.asList(value.f1.getSinkColumns().split(","));
+                    
+                    // data其实是一个map, 从map中删除键值对
+                    data.keySet().removeIf(key -> !columns.contains(key) && !"op_type".equals(key));
+                    
+                    
+                    return value;
+                }
+            });
+        
+        
+    }
+    
+    private SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> connect(
+        SingleOutputStreamOperator<JSONObject> dataStream,
+        SingleOutputStreamOperator<TableProcess> tpStream) {
         // 0. 根据配置信息,在Phoenix中创建相应的维度表
         tpStream = tpStream.map(new RichMapFunction<TableProcess, TableProcess>() {
             
@@ -70,6 +114,11 @@ public class DimApp extends BaseAppV1 {
             
             @Override
             public TableProcess map(TableProcess tp) throws Exception {
+                // 避免与服务器的长连接, 长时间没有使用, 服务器会自动关闭连接.
+                if (conn.isClosed()) {
+                    conn = JdbcUtil.getPhoenixConnection();
+                }
+                
                 // 建表操作
                 // create table if not exists table(name varchar, age varchar, constraint abc primary key(name)) null
                 
