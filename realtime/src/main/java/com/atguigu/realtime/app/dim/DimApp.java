@@ -12,6 +12,7 @@ import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.BroadcastState;
 import org.apache.flink.api.common.state.MapStateDescriptor;
+import org.apache.flink.api.common.state.ReadOnlyBroadcastState;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.datastream.BroadcastStream;
@@ -22,6 +23,7 @@ import org.apache.flink.streaming.api.functions.co.BroadcastProcessFunction;
 import org.apache.flink.util.Collector;
 
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 
 /**
  * @Author lzc
@@ -42,32 +44,57 @@ public class DimApp extends BaseAppV1 {
         // 2. 读取配置信息
         SingleOutputStreamOperator<TableProcess> tpStream = readTableProcess(env);
         // 3. 数据流和广播流做connect
-        connect(etledStream, tpStream);
-        
+        SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> dataTpStream = connect(etledStream, tpStream);
+        dataTpStream.print();
         // 4. 根据不同的配置信息, 把不同的维度写入到不同的Phoenix的表中
         
     }
     
-    private void connect(SingleOutputStreamOperator<JSONObject> dataStream,
-                         SingleOutputStreamOperator<TableProcess> tpStream) {
+    private SingleOutputStreamOperator<Tuple2<JSONObject, TableProcess>> connect(SingleOutputStreamOperator<JSONObject> dataStream,
+                                                                                 SingleOutputStreamOperator<TableProcess> tpStream) {
         // 0. 根据配置信息,在Phoenix中创建相应的维度表
         tpStream = tpStream.map(new RichMapFunction<TableProcess, TableProcess>() {
+            
+            private Connection conn;
+            
             @Override
             public void open(Configuration parameters) throws Exception {
-                Connection conn = JdbcUtil.getPhoenixConnection();
+                conn = JdbcUtil.getPhoenixConnection();
+                
             }
             
             @Override
             public void close() throws Exception {
-            
+                JdbcUtil.closeConnection(conn);
             }
             
             @Override
             public TableProcess map(TableProcess tp) throws Exception {
                 // 建表操作
-                // create table if not exists table(name varchar, age varchar, constraint abc primary key(name))
+                // create table if not exists table(name varchar, age varchar, constraint abc primary key(name)) null
                 
+                // 1. 拼接一个sql语句
+                StringBuilder sql = new StringBuilder();
+                sql
+                    .append("create table if not exists ")
+                    .append(tp.getSinkTable())
+                    .append("(")
+                    .append(tp.getSinkColumns().replaceAll("[^,]+", "$0 varchar"))
+                    .append(", constraint pk primary key(")
+                    .append(tp.getSinkPk() == null ? "id" : tp.getSinkPk())
+                    .append("))")
+                    .append(tp.getSinkExtend() == null ? "" : tp.getSinkExtend());
                 
+                System.out.println("phoenix建表语句: " + sql);
+                // 2. 获取预处理语句
+                PreparedStatement ps = conn.prepareStatement(sql.toString());
+                
+                // 3. 给sql中的占位符赋值(查增删改), ddl: 建表语句一般不会有占位符
+                // 略
+                // 4. 执行
+                ps.execute();
+                // 5. 关闭 ps
+                ps.close();
                 return tp;
             }
         });
@@ -79,7 +106,7 @@ public class DimApp extends BaseAppV1 {
         MapStateDescriptor<String, TableProcess> tpStateDesc = new MapStateDescriptor<>("tpState", String.class, TableProcess.class);
         BroadcastStream<TableProcess> tpBcStream = tpStream.broadcast(tpStateDesc);
         // 2. 让数据流去connect 广播流
-        dataStream
+        return dataStream
             .connect(tpBcStream)
             .process(new BroadcastProcessFunction<JSONObject, TableProcess, Tuple2<JSONObject, TableProcess>>() {
                 // 处理数据流中的元素
@@ -89,6 +116,19 @@ public class DimApp extends BaseAppV1 {
                                            Collector<Tuple2<JSONObject, TableProcess>> out) throws Exception {
                     // 4. 处理数据流中数据的时候, 从广播状态读取他对应的配置信息
                     // 根据什么获取到配置信息: 根据mysql中的表名
+                    ReadOnlyBroadcastState<String, TableProcess> state = ctx.getBroadcastState(tpStateDesc);
+                    String key = value.getString("table");
+                    
+                    TableProcess tp = state.get(key);
+                    // 如果不是维度表或者不需要sink的维度表, tp应该是null
+                    if (tp != null) {
+                        // 数据中的元数据信息无用了, 可以只取数据信息
+                        JSONObject data = value.getJSONObject("data");
+                        // 操作类型写入到data, 后面有用
+                        data.put("op_type", value.getString("type"));
+                        out.collect(Tuple2.of(data, tp));
+                    }
+                    
                 }
                 
                 // 处理广播流中的元素
@@ -161,4 +201,42 @@ public class DimApp extends BaseAppV1 {
 /*
 https://developer.aliyun.com/article/777502
 https://github.com/ververica/flink-cdc-connectors
+
+
+ SALT_BUCKETS = 4
+ 盐表
+ 
+ ------------
+ regionserver
+ region
+  数据
+  
+默认情况 建表一张表只有一个region
+
+当region膨胀一定程度, 会自动分裂
+    
+    旧: 10G 一分为2
+    
+    新: ...
+    
+    hadoop162
+     r1  r2
+     
+   自动迁移
+    r2 迁移到163
+    
+ -----
+ 必须分裂和迁移: 预分区
+ 
+ 
+ --------
+ 
+ Phoenix建表: 如果创建带有预分区的表?
+ 
+ 
+ 
+ 
+ 
+ 
+ 
  */
