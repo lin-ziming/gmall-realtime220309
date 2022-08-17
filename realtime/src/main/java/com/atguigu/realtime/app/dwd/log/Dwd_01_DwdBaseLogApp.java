@@ -2,10 +2,12 @@ package com.atguigu.realtime.app.dwd.log;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONAware;
 import com.alibaba.fastjson.JSONObject;
 import com.atguigu.realtime.app.BaseAppV1;
 import com.atguigu.realtime.common.Constant;
 import com.atguigu.realtime.util.AtguiguUtil;
+import com.atguigu.realtime.util.FlinkSinkUtil;
 import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
@@ -53,13 +55,17 @@ public class Dwd_01_DwdBaseLogApp extends BaseAppV1 {
         SingleOutputStreamOperator<JSONObject> validatedStream = validateNewOrOld(etledStreram);
         // 3. 分流
         Map<String, DataStream<JSONObject>> streams = splitStream(validatedStream);
-        streams.get(PAGE).print(PAGE);
-        streams.get(ERR).print(ERR);
-        streams.get(DISPLAY).print(DISPLAY);
-        streams.get(ACTION).print(ACTION);
-        streams.get(START).print(START);
-    
+        
         // 4. 写出到kafka中
+        writeToKafka(streams);
+    }
+    
+    private void writeToKafka(Map<String, DataStream<JSONObject>> streams) {
+        streams.get(PAGE).map(JSONAware::toJSONString).addSink(FlinkSinkUtil.getKafkaSink(Constant.TOPIC_DWD_TRAFFIC_PAGE));
+        streams.get(ERR).map(JSONAware::toJSONString).addSink(FlinkSinkUtil.getKafkaSink(Constant.TOPIC_DWD_TRAFFIC_ERR));
+        streams.get(ACTION).map(JSONAware::toJSONString).addSink(FlinkSinkUtil.getKafkaSink(Constant.TOPIC_DWD_TRAFFIC_ACTION));
+        streams.get(START).map(JSONAware::toJSONString).addSink(FlinkSinkUtil.getKafkaSink(Constant.TOPIC_DWD_TRAFFIC_START));
+        streams.get(DISPLAY).map(JSONAware::toJSONString).addSink(FlinkSinkUtil.getKafkaSink(Constant.TOPIC_DWD_TRAFFIC_DISPLAY));
     }
     
     private Map<String, DataStream<JSONObject>> splitStream(SingleOutputStreamOperator<JSONObject> validatedStream) {
