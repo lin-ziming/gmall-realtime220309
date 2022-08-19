@@ -60,7 +60,7 @@ public abstract class BaseSqlApp {
                             "dic_name string " +
                             ")with(" +
                             " 'connector'='jdbc',  " +
-                            " 'url' = 'jdbc:mysql://hadoop162:3306/gmall2022?useSSL=false',\n" +
+                            " 'url' = 'jdbc:mysql://hadoop162:3306/gmall2022?useSSL=false'," +
                             " 'table-name' = 'base_dic', " +
                             " 'username' = 'root',  " +
                             " 'password' = 'aaaaaa'," +
