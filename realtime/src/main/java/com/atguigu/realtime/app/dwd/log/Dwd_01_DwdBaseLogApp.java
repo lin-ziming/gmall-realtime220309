@@ -184,8 +184,10 @@ public class Dwd_01_DwdBaseLogApp extends BaseAppV1 {
                         // is_new是0, 状态是空
                         // 意味着, 用户曾经访问过, 但是程序中没有记录第一次访问时间
                         // 把状态更新成昨天
-                        String yesterday = AtguiguUtil.toDate(ts - (24 * 60 * 60 * 1000));
-                        firstVisitDateState.update(yesterday);
+                        if (firstVisitDateState == null) {
+                            String yesterday = AtguiguUtil.toDate(ts - (24 * 60 * 60 * 1000));
+                            firstVisitDateState.update(yesterday);
+                        }
                     }
                     return value;
                 }

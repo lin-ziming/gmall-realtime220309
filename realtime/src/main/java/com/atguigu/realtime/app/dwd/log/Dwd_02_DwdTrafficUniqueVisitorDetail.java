@@ -20,6 +20,7 @@ import org.apache.flink.util.Collector;
 
 import java.time.Duration;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -72,8 +73,8 @@ public class Dwd_02_DwdTrafficUniqueVisitorDetail extends BaseAppV1 {
                     if (!today.equals(date)) {  // 今天和状态只日期不等, 则表示当天的第一个窗口
                         List<JSONObject> list = AtguiguUtil.toList(elements);
                         
-                        JSONObject min = Collections.min(list, (o1, o2) -> o2.getLong("ts").compareTo(o1.getLong("ts")));
-                        
+                        //                        JSONObject min = Collections.min(list, (o1, o2) -> o1.getLong("ts").compareTo(o2.getLong("ts")));
+                        JSONObject min = Collections.min(list, Comparator.comparing(o -> o.getLong("ts")));
                         out.collect(min.toJSONString());
                         
                         visitDateState.update(today);// 更新状态
@@ -82,7 +83,7 @@ public class Dwd_02_DwdTrafficUniqueVisitorDetail extends BaseAppV1 {
                     
                 }
             })
-           .addSink(FlinkSinkUtil.getKafkaSink(Constant.TOPIC_DWD_TRAFFIC_UV_DETAIL));
+            .addSink(FlinkSinkUtil.getKafkaSink(Constant.TOPIC_DWD_TRAFFIC_UV_DETAIL));
     }
 }
 /*
