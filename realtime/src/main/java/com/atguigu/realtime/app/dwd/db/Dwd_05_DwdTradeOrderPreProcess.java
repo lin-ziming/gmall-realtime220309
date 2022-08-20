@@ -7,6 +7,8 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.table.api.Table;
 import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 
+import java.time.Duration;
+
 /**
  * @Author lzc
  * @Date 2022/8/20 8:33
@@ -23,6 +25,8 @@ public class Dwd_05_DwdTradeOrderPreProcess extends BaseSqlApp {
     @Override
     protected void handle(StreamExecutionEnvironment env,
                           StreamTableEnvironment tEnv) {
+        tEnv.getConfig().setIdleStateRetention(Duration.ofMinutes(30));
+//        tEnv.getConfig().getConfiguration().setString("table.exec.state.ttl", "30 minute");
         
         // 1. 读取ods_db
         readOdsDb(tEnv, "Dwd_05_DwdTradeOrderPreProcess");
