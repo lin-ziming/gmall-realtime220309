@@ -23,6 +23,7 @@ public class Dwd_05_DwdTradeOrderPreProcess extends BaseSqlApp {
     @Override
     protected void handle(StreamExecutionEnvironment env,
                           StreamTableEnvironment tEnv) {
+        
         // 1. 读取ods_db
         readOdsDb(tEnv, "Dwd_05_DwdTradeOrderPreProcess");
         

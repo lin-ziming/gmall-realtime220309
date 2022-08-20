@@ -5,6 +5,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 
 import java.time.Duration;
+import java.time.ZoneOffset;
 
 /**
  * @Author lzc
@@ -18,6 +19,7 @@ public class Join_7 {
         env.setParallelism(1);
         
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
+        tEnv.getConfig().setLocalTimeZone(ZoneOffset.ofHours(8));
         
         // 给join的时候的状态设置ttl
         tEnv.getConfig().setIdleStateRetention(Duration.ofSeconds(10));
