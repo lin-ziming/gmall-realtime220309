@@ -28,7 +28,7 @@ public class Dwd_10_DwdTradeRefundPaySuc extends BaseSqlApp {
         tEnv.getConfig().setIdleStateRetention(Duration.ofSeconds(10));
         
         // 1. 读取ods_db
-        readOdsDb(tEnv, "Dwd_09_DwdTradeOrderRefund");
+        readOdsDb(tEnv, "Dwd_10_DwdTradeRefundPaySuc");
         
         // 2. 读取字典表
         readBaseDic(tEnv);
