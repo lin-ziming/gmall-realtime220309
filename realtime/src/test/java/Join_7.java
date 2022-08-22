@@ -5,6 +5,7 @@ import org.apache.flink.table.api.bridge.java.StreamTableEnvironment;
 import org.apache.flink.types.Row;
 
 import java.time.Duration;
+import java.time.ZoneOffset;
 
 /**
  * @Author lzc
@@ -18,8 +19,8 @@ public class Join_7 {
         env.setParallelism(1);
         
         StreamTableEnvironment tEnv = StreamTableEnvironment.create(env);
-//        tEnv.getConfig().setLocalTimeZone(ZoneOffset.ofHours(8));
-        tEnv.getConfig().getConfiguration().setString("table.local-time-zone", "UTC");
+        tEnv.getConfig().setLocalTimeZone(ZoneOffset.ofHours(8));
+//        tEnv.getConfig().getConfiguration().setString("table.local-time-zone", "UTC");
         
         // 给join的时候的状态设置ttl
         tEnv.getConfig().setIdleStateRetention(Duration.ofSeconds(10));
@@ -27,8 +28,8 @@ public class Join_7 {
         tEnv.executeSql("create table t1(" +
                             "id string, " +
                             "name string, " +
-                            "crt as CONVERT_TZ(date_format(current_row_timestamp(), 'yyyy-MM-dd HH:mm:ss'), 'UTC', 'Asia/Shanghai'), " +
-                            "a as date_format(current_row_timestamp(), 'yyyy-MM-dd HH:mm:ss.SSS')" +
+                            "a as current_row_timestamp(), " +
+                            "b as date_format(current_row_timestamp(), 'yyyy-MM-dd HH:mm:ss.SSS')" +
                             ")with(" +
                             " 'connector'='kafka', " +
                             " 'properties.bootstrap.servers'='hadoop162:9092', " +
