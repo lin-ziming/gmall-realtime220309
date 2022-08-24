@@ -84,5 +84,35 @@ public class Dws_01_DwsTrafficSourceKeywordPageViewWindow extends BaseSqlApp {
     }
 }
 /*
- 
+ 流量域来源关键词粒度页面浏览各窗口汇总表
+
+搜索记录, 找到用户的搜索关键词, 统计关键词在每个窗口内出现的次数
+
+数据源:
+    页面日志
+
+     "item" is not null
+    "item_type" = "keyword",
+    "last_page_id"= "search"
+
+"华为手机"
+小米手机
+苹果手机
+--------
+对关键词进行分词: Ik分词器
+"华为
+手机"
+小米
+手机
+苹果
+手机
+
+开窗聚合, 统计每个关键词的次数
+  group window
+  tvf
+    选tvf
+  over
+
+把统计结果写出到oris
+
  */
