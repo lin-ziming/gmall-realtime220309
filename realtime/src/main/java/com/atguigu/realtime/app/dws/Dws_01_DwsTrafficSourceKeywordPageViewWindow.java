@@ -34,30 +34,55 @@ public class Dws_01_DwsTrafficSourceKeywordPageViewWindow extends BaseSqlApp {
                             + SQLUtil.getKafkaSource(Constant.TOPIC_DWD_TRAFFIC_PAGE, "Dws_01_DwsTrafficSourceKeywordPageViewWindow"));
         // 2. 过滤出关键词
         Table keywordTable = tEnv.sqlQuery("select " +
-                                        " page['item'] keyword, " +
-                                        " et " +
-                                        "from page " +
-                                        "where page['last_page_id']= 'search' " +
-                                        "and page['item_type']='keyword' " +
-                                        "and page['item'] is not null");
+                                               " page['item'] keyword, " +
+                                               " et " +
+                                               "from page " +
+                                               "where page['last_page_id']= 'search' " +
+                                               "and page['item_type']='keyword' " +
+                                               "and page['item'] is not null");
         tEnv.createTemporaryView("keyword_table", keywordTable);
-    
+        
         // 3. 对关键词进行分词
         // 自定义函数  标量 制表 聚合 制表聚合
         tEnv.createTemporaryFunction("ik_analyzer", IkAnalyzer.class);
-        tEnv.sqlQuery("select" +
-                          " kw, " +
-                          " et " +
-                          "from keyword_table " +
-                          "join lateral table(ik_analyzer(keyword)) on true").execute().print();
-        
-        
+        Table kwTable = tEnv.sqlQuery("select" +
+                                          " kw, " +
+                                          " et " +
+                                          "from keyword_table " +
+                                          "join lateral table(ik_analyzer(keyword)) on true");
+        tEnv.createTemporaryView("kw_table", kwTable);
         // 4. 对分词后的次,开窗聚合统计次数
+        Table result = tEnv.sqlQuery("select " +
+                                         " date_format(window_start, 'yyyy-MM-dd HH:mm:ss') stt, " +
+                                         " date_format(window_end, 'yyyy-MM-dd HH:mm:ss') edt, " +
+                                         " 'search' source, " +
+                                         " kw keyword,  " +
+                                         " date_format(window_start, 'yyyy-MM-dd') cur_date, " +  // 这个是表示统计日期
+                                         " count(*) keyword_count " +
+                                         "from table( tumble( table kw_table, descriptor(et), interval '5' second ) ) " +
+                                         "group by window_start, window_end, kw");
         
         // 5. 写出到 doris 中
+        tEnv.executeSql("create table kw(" +
+                            " stt string, " +
+                            " edt string, " +
+                            " source string, " +
+                            " keyword string, " +
+                            " cur_date string, " +
+                            " keyword_count bigint " +
+                            ")with(" +
+                            "  'connector' = 'doris', " +
+                            "  'fenodes' = 'hadoop162:7030', " +
+                            "  'table.identifier' = 'gmall2022.dws_traffic_source_keyword_page_view_window', " +
+                            "  'username' = 'root', " +
+                            "  'password' = 'aaaaaa' " +
+                            ")");
+    
+        result.executeInsert("kw");
+        
         
     }
 }
 /*
-
+ 
  */

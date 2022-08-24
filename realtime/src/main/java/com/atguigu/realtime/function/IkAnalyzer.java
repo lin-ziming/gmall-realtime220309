@@ -17,7 +17,7 @@ public class IkAnalyzer extends TableFunction<Row> {
     
     public void eval(String keyword){
         //keyword 使用ik分词器进行分词, 分出来几个词, 就是几行
-       List<String> kws = IkUtil.split(keyword);
+       List<String> kws = IkUtil.split(keyword, true);
        
         for (String kw : kws) {
             collect(Row.of(kw));
