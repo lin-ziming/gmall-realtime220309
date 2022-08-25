@@ -1,5 +1,6 @@
 package com.atguigu.realtime.bean;
 
+import com.alibaba.fastjson.annotation.JSONField;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 
@@ -17,6 +18,7 @@ public class TrafficPageViewBean {
     // 地区
     String ar;
     // 新老访客状态标记
+//    @JSONField(name = "is_new")  // 一个一个的设置, 比较麻烦
     String isNew ;
     // 当天日期
     String curDate;
@@ -31,5 +33,6 @@ public class TrafficPageViewBean {
     // 跳出会话数
     Long ujCt;
     // 时间戳
+    @JSONField(serialize = false) // 这个字段不需要序列化到json字符串中, 可以加主键
     Long ts;
 }

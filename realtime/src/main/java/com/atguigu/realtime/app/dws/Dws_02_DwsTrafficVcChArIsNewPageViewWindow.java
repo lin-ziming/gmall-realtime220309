@@ -2,9 +2,12 @@ package com.atguigu.realtime.app.dws;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.PropertyNamingStrategy;
+import com.alibaba.fastjson.serializer.SerializeConfig;
 import com.atguigu.realtime.app.BaseAppV2;
 import com.atguigu.realtime.bean.TrafficPageViewBean;
 import com.atguigu.realtime.util.AtguiguUtil;
+import com.atguigu.realtime.util.FlinkSinkUtil;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.streaming.api.datastream.DataStream;
@@ -47,12 +50,26 @@ public class Dws_02_DwsTrafficVcChArIsNewPageViewWindow extends BaseAppV2 {
         DataStream<TrafficPageViewBean> beanStream = parseAndUnionOne(streams);
         // 2. 开窗聚合
         SingleOutputStreamOperator<TrafficPageViewBean> resultStream = windowAndAgg(beanStream);
-        resultStream.print("normal");
-        resultStream.getSideOutput(new OutputTag<TrafficPageViewBean>("late") {}).print("late");
-        
+        //        resultStream.print("normal");
+        //        resultStream.getSideOutput(new OutputTag<TrafficPageViewBean>("late") {}).print("late");
         // 3. 写出到doris中
+        writeToDoris(resultStream);
         
         
+    }
+    
+    private void writeToDoris(SingleOutputStreamOperator<TrafficPageViewBean> resultStream) {
+        resultStream
+            .map(bean -> {
+                SerializeConfig config = new SerializeConfig();
+                config.propertyNamingStrategy = PropertyNamingStrategy.SnakeCase;  // 转成json的时候, 属性名使用下划线
+//                config.propertyNamingStrategy = PropertyNamingStrategy.KebabCase;  // 转成json的时候, 属性名使用下划线
+                String json = JSON.toJSONString(bean, config);
+                System.out.println(json);
+                return json;
+            })
+            
+            .addSink(FlinkSinkUtil.getDorisSink("gmall2022.dws_traffic_vc_ch_ar_is_new_page_view_window"));
     }
     
     private SingleOutputStreamOperator<TrafficPageViewBean> windowAndAgg(DataStream<TrafficPageViewBean> beanStream) {

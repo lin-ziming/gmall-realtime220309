@@ -29,4 +29,6 @@ public class Constant {
     
     public static final String TOPIC_DWD_TRADE_REFUND_PAY_SUC = "dwd_trade_refund_pay_suc";
     
+    public static final String DORIS_HOST = "hadoop162:7030";
+    
 }
