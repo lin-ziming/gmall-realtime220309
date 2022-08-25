@@ -33,6 +33,6 @@ public class TrafficPageViewBean {
     // 跳出会话数
     Long ujCt;
     // 时间戳
-    @JSONField(serialize = false) // 这个字段不需要序列化到json字符串中, 可以加主键
+    @JSONField(serialize = false) // 这个字段不需要序列化到json字符串中, 可以加这个注解
     Long ts;
 }
