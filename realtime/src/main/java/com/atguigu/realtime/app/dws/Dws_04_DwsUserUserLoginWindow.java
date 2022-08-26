@@ -5,11 +5,12 @@ import com.alibaba.fastjson.JSONObject;
 import com.alibaba.fastjson.PropertyNamingStrategy;
 import com.alibaba.fastjson.serializer.SerializeConfig;
 import com.atguigu.realtime.app.BaseAppV1;
-import com.atguigu.realtime.bean.TrafficHomeDetailPageViewBean;
 import com.atguigu.realtime.bean.UserLoginBean;
 import com.atguigu.realtime.common.Constant;
 import com.atguigu.realtime.util.AtguiguUtil;
 import com.atguigu.realtime.util.FlinkSinkUtil;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
+import org.apache.flink.api.common.functions.ReduceFunction;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
@@ -17,7 +18,13 @@ import org.apache.flink.streaming.api.datastream.DataStreamSource;
 import org.apache.flink.streaming.api.datastream.SingleOutputStreamOperator;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
+import org.apache.flink.streaming.api.functions.windowing.ProcessAllWindowFunction;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
+import org.apache.flink.streaming.api.windowing.time.Time;
+import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
+
+import java.time.Duration;
 
 /**
  * @Author lzc
@@ -39,15 +46,55 @@ public class Dws_04_DwsUserUserLoginWindow extends BaseAppV1 {
         // 1. 先找到用户登录记录
         SingleOutputStreamOperator<JSONObject> loginDataStream = findLoginLog(stream);
         // 2. 找到当日登录用户记录和7日回流用户记录
-        findUVAndBack(loginDataStream).print();
-        
+        SingleOutputStreamOperator<UserLoginBean> beanSteam = findUVAndBack(loginDataStream);
         // 3. 开窗聚合
-        
+        SingleOutputStreamOperator<UserLoginBean> resultStream = windowAndAgg(beanSteam);
         // 4. 写出到doris中
+        writeToDoris(resultStream);
     }
     
-    private SingleOutputStreamOperator<UserLoginBean> findUVAndBack(SingleOutputStreamOperator<JSONObject> loginDataStream) {
-       return loginDataStream
+    private SingleOutputStreamOperator<UserLoginBean> windowAndAgg(
+        SingleOutputStreamOperator<UserLoginBean> beanSteam) {
+        return beanSteam
+            .assignTimestampsAndWatermarks(
+                WatermarkStrategy
+                    .<UserLoginBean>forBoundedOutOfOrderness(Duration.ofSeconds(3))
+                    .withTimestampAssigner((bean, ts) -> bean.getTs())
+            )
+            .windowAll(TumblingEventTimeWindows.of(Time.seconds(5)))
+            .reduce(
+                new ReduceFunction<UserLoginBean>() {
+                    @Override
+                    public UserLoginBean reduce(UserLoginBean bean1,
+                                                UserLoginBean bean2) throws Exception {
+                        bean1.setUuCt(bean1.getUuCt() + bean2.getUuCt());
+                        bean1.setBackCt(bean1.getBackCt() + bean2.getBackCt());
+                        return bean1;
+                    }
+                },
+                new ProcessAllWindowFunction<UserLoginBean, UserLoginBean, TimeWindow>() {
+                    @Override
+                    public void process(Context ctx,
+                                        Iterable<UserLoginBean> elements,
+                                        Collector<UserLoginBean> out) throws Exception {
+    
+                        UserLoginBean bean = elements.iterator().next();
+                        
+                        bean.setStt(AtguiguUtil.toDateTime(ctx.window().getStart()));
+                        bean.setEdt(AtguiguUtil.toDateTime(ctx.window().getEnd()));
+                        
+                        bean.setCurDate(AtguiguUtil.toDate(System.currentTimeMillis()));
+                        
+                        out.collect(bean);
+    
+                    }
+                }
+            );
+    }
+    
+    private SingleOutputStreamOperator<UserLoginBean> findUVAndBack(
+        SingleOutputStreamOperator<JSONObject> loginDataStream) {
+        return loginDataStream
             .keyBy(obj -> obj.getJSONObject("common").getString("uid"))
             .process(new KeyedProcessFunction<String, JSONObject, UserLoginBean>() {
                 
@@ -134,14 +181,14 @@ public class Dws_04_DwsUserUserLoginWindow extends BaseAppV1 {
         
     }
     
-    private void writeToDoris(SingleOutputStreamOperator<TrafficHomeDetailPageViewBean> resultStream) {
+    private void writeToDoris(SingleOutputStreamOperator<UserLoginBean> resultStream) {
         resultStream
             .map(bean -> {
                 SerializeConfig config = new SerializeConfig();
                 config.propertyNamingStrategy = PropertyNamingStrategy.SnakeCase;  // 转成json的时候, 属性名使用下划线
                 return JSON.toJSONString(bean, config);
             })
-            .addSink(FlinkSinkUtil.getDorisSink(""));
+            .addSink(FlinkSinkUtil.getDorisSink("gmall2022.dws_user_user_login_window"));
     }
     
     
