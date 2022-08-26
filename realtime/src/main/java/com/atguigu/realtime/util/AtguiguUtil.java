@@ -1,5 +1,6 @@
 package com.atguigu.realtime.util;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -13,14 +14,23 @@ public class AtguiguUtil {
         return new SimpleDateFormat("yyyy-MM-dd").format(ts);
     }
     
-    public static <T>List<T> toList(Iterable<T> it) {
+    public static <T> List<T> toList(Iterable<T> it) {
         List<T> list = new ArrayList<>();
-//        it.forEach(e -> list.add(e));
+        //        it.forEach(e -> list.add(e));
         it.forEach(list::add);
         return list;
     }
     
     public static String toDateTime(long ts) {
         return new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(ts);
+    }
+    
+    public static Long toTs(String date) {
+        try {
+            return new SimpleDateFormat("yyyy-MM-dd").parse(date).getTime();
+        } catch (ParseException e) {
+            e.printStackTrace();
+        }
+        return null;
     }
 }
