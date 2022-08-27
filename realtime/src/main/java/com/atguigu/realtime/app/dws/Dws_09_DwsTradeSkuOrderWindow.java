@@ -1,14 +1,19 @@
 package com.atguigu.realtime.app.dws;
 
+import com.alibaba.druid.pool.DruidDataSource;
+import com.alibaba.druid.pool.DruidPooledConnection;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
 import com.atguigu.realtime.app.BaseAppV1;
 import com.atguigu.realtime.bean.TradeSkuOrderBean;
 import com.atguigu.realtime.common.Constant;
 import com.atguigu.realtime.util.AtguiguUtil;
+import com.atguigu.realtime.util.DimUtil;
+import com.atguigu.realtime.util.DruidDSUtil;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
+import org.apache.flink.api.common.functions.RichMapFunction;
 import org.apache.flink.api.common.state.ValueState;
 import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.configuration.Configuration;
@@ -49,16 +54,48 @@ public class Dws_09_DwsTradeSkuOrderWindow extends BaseAppV1 {
         // 2. 把数据封装到pojo中
         SingleOutputStreamOperator<TradeSkuOrderBean> beanStream = parseToPojo(distinctedStream);
         // 3. 按照 sku_id 分组 开窗聚合
-        windowAndAgg(beanStream).print();
-        
+        SingleOutputStreamOperator<TradeSkuOrderBean> beanStreamWithoutDim = windowAndAgg(beanStream);
         // 4. 补充维度信息
+        addDim(beanStreamWithoutDim).print();
         
         // 5. 写出到doris中
         
     }
     
-    private SingleOutputStreamOperator<TradeSkuOrderBean> windowAndAgg(SingleOutputStreamOperator<TradeSkuOrderBean> beanStream) {
-       return beanStream
+    private SingleOutputStreamOperator<TradeSkuOrderBean> addDim(
+        SingleOutputStreamOperator<TradeSkuOrderBean> beanStreamWithoutDim) {
+        
+        // 补充维度信息:条数据, 需要查询6张维度表
+        return beanStreamWithoutDim.map(new RichMapFunction<TradeSkuOrderBean, TradeSkuOrderBean>() {
+            
+            private DruidDataSource druidDataSource;
+            
+            @Override
+            public void open(Configuration parameters) throws Exception {
+                druidDataSource = DruidDSUtil.getDruidDataSource();
+                
+            }
+            
+            @Override
+            public TradeSkuOrderBean map(TradeSkuOrderBean bean) throws Exception {
+                DruidPooledConnection phoenixConn = druidDataSource.getConnection();
+                // 1. 查找dim_sku_info
+                // select * from dim_sku_info where id='1';
+                // JSONObject : {"列名": 值, ...}
+                JSONObject skuInfo = DimUtil.readDimFromPhoenix(phoenixConn, "dim_sku_info", bean.getSkuId());
+                
+                bean.setSkuName(skuInfo.getString("SKU_NAME"));
+                
+                
+                return bean;
+            }
+        });
+        
+    }
+    
+    private SingleOutputStreamOperator<TradeSkuOrderBean> windowAndAgg(
+        SingleOutputStreamOperator<TradeSkuOrderBean> beanStream) {
+        return beanStream
             .assignTimestampsAndWatermarks(
                 WatermarkStrategy
                     .<TradeSkuOrderBean>forBoundedOutOfOrderness(Duration.ofSeconds(3))
@@ -71,7 +108,7 @@ public class Dws_09_DwsTradeSkuOrderWindow extends BaseAppV1 {
                     @Override
                     public TradeSkuOrderBean reduce(TradeSkuOrderBean bean1,
                                                     TradeSkuOrderBean bean2) throws Exception {
-//                        System.out.println("bean1: " + bean1 + ", bean2: " + bean2);
+                        //                        System.out.println("bean1: " + bean1 + ", bean2: " + bean2);
                         bean1.setOriginalAmount(bean1.getOriginalAmount().add(bean2.getOriginalAmount()));
                         bean1.setActivityAmount(bean1.getActivityAmount().add(bean2.getActivityAmount()));
                         bean1.setCouponAmount(bean1.getCouponAmount().add(bean2.getCouponAmount()));
@@ -89,7 +126,7 @@ public class Dws_09_DwsTradeSkuOrderWindow extends BaseAppV1 {
                         
                         bean.setStt(AtguiguUtil.toDateTime(ctx.window().getStart()));
                         bean.setEdt(AtguiguUtil.toDateTime(ctx.window().getEnd()));
-    
+                        
                         bean.setCurDate(AtguiguUtil.toDate(System.currentTimeMillis()));
                         
                         out.collect(bean);
