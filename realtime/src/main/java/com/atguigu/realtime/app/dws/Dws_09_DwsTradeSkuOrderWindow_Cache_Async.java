@@ -2,11 +2,14 @@ package com.atguigu.realtime.app.dws;
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.alibaba.fastjson.PropertyNamingStrategy;
+import com.alibaba.fastjson.serializer.SerializeConfig;
 import com.atguigu.realtime.app.BaseAppV1;
 import com.atguigu.realtime.bean.TradeSkuOrderBean;
 import com.atguigu.realtime.common.Constant;
 import com.atguigu.realtime.function.DimAsyncFunction;
 import com.atguigu.realtime.util.AtguiguUtil;
+import com.atguigu.realtime.util.FlinkSinkUtil;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
@@ -54,10 +57,20 @@ public class Dws_09_DwsTradeSkuOrderWindow_Cache_Async extends BaseAppV1 {
         // 3. 按照 sku_id 分组 开窗聚合
         SingleOutputStreamOperator<TradeSkuOrderBean> beanStreamWithoutDim = windowAndAgg(beanStream);
         // 4. 补充维度信息
-        addDim(beanStreamWithoutDim).print();
-        
+        SingleOutputStreamOperator<TradeSkuOrderBean> beanStreamWithDim = addDim(beanStreamWithoutDim);
         // 5. 写出到doris中
+        writeToDoris(beanStreamWithDim);
         
+    }
+    
+    private void writeToDoris(SingleOutputStreamOperator<TradeSkuOrderBean> beanStreamWithDim) {
+        beanStreamWithDim
+            .map(bean -> {
+                SerializeConfig conf = new SerializeConfig();
+                conf.propertyNamingStrategy = PropertyNamingStrategy.SnakeCase;
+                return JSON.toJSONString(bean, conf);
+            })
+            .addSink(FlinkSinkUtil.getDorisSink("gmall2022.dws_trade_sku_order_window"));
     }
     
     private SingleOutputStreamOperator<TradeSkuOrderBean> addDim(
@@ -97,12 +110,12 @@ public class Dws_09_DwsTradeSkuOrderWindow_Cache_Async extends BaseAppV1 {
                 public String getTable() {
                     return "dim_base_trademark";
                 }
-                
+            
                 @Override
                 public String getId(TradeSkuOrderBean input) {
                     return input.getTrademarkId();
                 }
-                
+            
                 @Override
                 public void addDim(JSONObject dim, TradeSkuOrderBean bean) {
                     bean.setTrademarkName(dim.getString("TM_NAME"));
@@ -343,6 +356,35 @@ public class Dws_09_DwsTradeSkuOrderWindow_Cache_Async extends BaseAppV1 {
     }
 }
 /*
+异步超时:
+ 其他原因导致的异步超时
+ 
+ 1. 用到的所有集群全部正常开启
+    hadoop hbase redis zk kafka maxwell
+    预处理app 详情app  dimapp
+    
+    hbase修复:
+        zk: deletall /hbase
+        hdfs: /hbase
+        
+   kafka修复:
+        zk:  /kafka
+        
+        kafka: $kafka_home/logs/* 删光
+        
+ 2. 检查下redis
+    启动redis一定要正确的配置
+        redis-server /etc/redis.conf
+ 
+ 3. 检查下6张维度表是否齐全, 并且都有数据
+     maxwell 同步下所有的维度数据
+     
+ 4. 调试
+        id传错了
+        
+ 5. 找我
+
+
 要使用异步io, 用的数据库客户端必须提供异步客户端
 
 redis和phoenix都没有异步客户端

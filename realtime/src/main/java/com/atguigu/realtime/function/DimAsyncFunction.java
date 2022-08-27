@@ -72,4 +72,27 @@ public abstract class DimAsyncFunction<T> extends RichAsyncFunction<T, T> {
             }
         });
     }
+    
+    @Override
+    public void timeout(T input, ResultFuture<T> resultFuture) throws Exception {
+        System.out.println("异步超时:\n" +
+                               " 其他原因导致的异步超时\n" +
+                               " \n" +
+                               " 1. 用到的所有集群全部正常开启\n" +
+                               "    hadoop hbase redis zk kafka maxwell\n" +
+                               "    预处理app 详情app  dimapp\n" +
+                               " 2. 检查下redis\n" +
+                               "    启动redis一定要正确的配置\n" +
+                               "        redis-server /etc/redis.conf\n" +
+                               " \n" +
+                               " 3. 检查下6张维度表是否齐全, 并且都有数据\n" +
+                               "     maxwell 同步下所有的维度数据\n" +
+                               "     \n" +
+                               " 4. 调试\n" +
+                               "        id传错了\n" +
+                               "        \n" +
+                               " 5. 找我");
+        super.timeout(input, resultFuture);
+        
+    }
 }

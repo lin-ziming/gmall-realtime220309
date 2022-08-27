@@ -1,5 +1,6 @@
 package com.atguigu.realtime.bean;
 
+import com.alibaba.fastjson.annotation.JSONField;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -42,10 +43,14 @@ public class TradeSkuOrderBean {
     // 当天日期
     String curDate;
     // 原始金额
-    BigDecimal originalAmount;
     // 活动减免金额
+    
+    @JSONField(name = "order_origin_total_amount")
+    BigDecimal originalAmount;
+    @JSONField(name = "order_activity_reduce_amount")
     BigDecimal activityAmount;
     // 优惠券减免金额
+    @JSONField(name = "order_coupon_reduce_amount")
     BigDecimal couponAmount;
     // 下单金额
     BigDecimal orderAmount;
