@@ -1,6 +1,8 @@
 package com.atguigu.realtime.util;
 
+import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONObject;
+import com.atguigu.realtime.common.Constant;
 import redis.clients.jedis.Jedis;
 
 import java.sql.Connection;
@@ -37,7 +39,6 @@ public class DimUtil {
             dim = readDimFromPhoenix(phoenixConn, table, id);
             // 维度写入读到redis
             writeDimToRedis(redisClient, table, id, dim);
-            
         } else {
             System.out.println("走缓存: " + table + "  " + id);
         }
@@ -47,11 +48,75 @@ public class DimUtil {
     
     //TODO
     private static void writeDimToRedis(Jedis redisClient, String table, String id, JSONObject dim) {
-    
+        String key = table + ":" + id;
+        String value = dim.toJSONString();
+        
+        /*redisClient.set(key, value);
+        redisClient.expire(key,); */ // 设置ttl
+        
+        redisClient.setex(key, Constant.TWO_DAY_SECOND, value);
+        
+        
     }
     
     //TODO
     private static JSONObject readDimFromRedis(Jedis redisClient, String table, String id) {
+        String key = table + ":" + id;
+        String json = redisClient.get(key);
+        if (json != null) {
+            return JSON.parseObject(json);
+        }
+    
         return null;
     }
 }
+/*
+redis中数据类型的选择
+
+string
+ key         string
+ 表名+id     {json格式字符串}
+ 
+ 好处:
+    读写方便
+  坏处:
+    key比较多, 一个id占用一个key
+    
+    解决:
+        专门放入一个库中
+        
+     
+     会给key添加ttl,
+     
+     
+     每个key可以单独设置ttl
+
+
+list
+   key    value
+   
+   表名   {json格式字符串}, {...}, {....}
+   
+   好处: 可以只有6个
+   坏处: 写比较方便 读不行. 需要变量list
+  
+set
+
+
+
+hash
+ key      field    value
+ 表名      id      json'格式字符串
+ 
+ 
+ 好处:
+    key只有6个
+    读写方便
+ 
+ 坏处:
+ 
+    没有办法单独给每个维度设置ttl
+
+zset
+
+ */

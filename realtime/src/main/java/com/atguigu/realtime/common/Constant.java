@@ -31,4 +31,5 @@ public class Constant {
     
     public static final String DORIS_HOST = "hadoop162:7030";
     
+    public static final int TWO_DAY_SECOND = 2 * 24 * 60 * 60;
 }

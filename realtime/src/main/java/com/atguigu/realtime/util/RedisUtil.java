@@ -29,6 +29,8 @@ public class RedisUtil {
     private static JedisPool pool;
     
     public static Jedis getRedisClient() {
-        return pool.getResource();
+        Jedis jedis = pool.getResource();
+        jedis.select(1);  // 默认选择 1号库
+        return jedis;
     }
 }
