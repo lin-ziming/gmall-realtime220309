@@ -83,6 +83,7 @@ public class JdbcUtil {
                 result.add(t);
     
             }
+            ps.close();
     
     
         } catch (Exception e) {

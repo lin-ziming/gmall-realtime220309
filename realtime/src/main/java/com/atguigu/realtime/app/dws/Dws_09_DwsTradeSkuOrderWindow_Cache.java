@@ -10,6 +10,7 @@ import com.atguigu.realtime.common.Constant;
 import com.atguigu.realtime.util.AtguiguUtil;
 import com.atguigu.realtime.util.DimUtil;
 import com.atguigu.realtime.util.DruidDSUtil;
+import com.atguigu.realtime.util.RedisUtil;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.MapFunction;
 import org.apache.flink.api.common.functions.ReduceFunction;
@@ -26,6 +27,7 @@ import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindo
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.util.Collector;
+import redis.clients.jedis.Jedis;
 
 import java.math.BigDecimal;
 import java.time.Duration;
@@ -34,9 +36,9 @@ import java.time.Duration;
  * @Author lzc
  * @Date 2022/8/26 13:36
  */
-public class Dws_09_DwsTradeSkuOrderWindow extends BaseAppV1 {
+public class Dws_09_DwsTradeSkuOrderWindow_Cache extends BaseAppV1 {
     public static void main(String[] args) {
-        new Dws_09_DwsTradeSkuOrderWindow().init(
+        new Dws_09_DwsTradeSkuOrderWindow_Cache().init(
             4009,
             2,
             "Dws_09_DwsTradeSkuOrderWindow",
@@ -67,50 +69,59 @@ public class Dws_09_DwsTradeSkuOrderWindow extends BaseAppV1 {
         
         // 补充维度信息:条数据, 需要查询6张维度表
         return beanStreamWithoutDim.map(new RichMapFunction<TradeSkuOrderBean, TradeSkuOrderBean>() {
-            
+    
+            private Jedis redisClient;
             private DruidDataSource druidDataSource;
             
             @Override
             public void open(Configuration parameters) throws Exception {
-                druidDataSource = DruidDSUtil.getDruidDataSource();
-                
+                druidDataSource = DruidDSUtil.getDruidDataSource();  // 连接池
+                redisClient = RedisUtil.getRedisClient();
+    
             }
-            
+    
+            @Override
+            public void close() throws Exception {
+                druidDataSource.close();
+                redisClient.close(); // 归还redis连接
+            }
+    
             @Override
             public TradeSkuOrderBean map(TradeSkuOrderBean bean) throws Exception {
                 DruidPooledConnection phoenixConn = druidDataSource.getConnection();
                 // 1. 查找dim_sku_info
                 // select * from dim_sku_info where id='1';
                 // JSONObject : {"列名": 值, ...}
-                JSONObject skuInfo = DimUtil.readDimFromPhoenix(phoenixConn, "dim_sku_info", bean.getSkuId());
+                JSONObject skuInfo = DimUtil.readDim(redisClient, phoenixConn, "dim_sku_info", bean.getSkuId());
                 bean.setSkuName(skuInfo.getString("SKU_NAME"));
                 bean.setTrademarkId(skuInfo.getString("TM_ID"));
                 bean.setSpuId(skuInfo.getString("SPU_ID"));
                 bean.setCategory3Id(skuInfo.getString("CATEGORY3_ID"));
                 
                 //2. tm
-                JSONObject baseTrademark = DimUtil.readDimFromPhoenix(phoenixConn, "dim_base_trademark", bean.getTrademarkId());
+                JSONObject baseTrademark = DimUtil.readDim(redisClient,phoenixConn, "dim_base_trademark", bean.getTrademarkId());
                 bean.setTrademarkName(baseTrademark.getString("TM_NAME"));
                 
                 // 3. spu
-                JSONObject spuInfo = DimUtil.readDimFromPhoenix(phoenixConn, "dim_spu_info", bean.getSpuId());
+                JSONObject spuInfo = DimUtil.readDim(redisClient,phoenixConn, "dim_spu_info", bean.getSpuId());
                 bean.setSpuName(spuInfo.getString("SPU_NAME"));
                 
                 // 4. c3
-                JSONObject c3 = DimUtil.readDimFromPhoenix(phoenixConn, "dim_base_category3", bean.getCategory3Id());
+                JSONObject c3 = DimUtil.readDim(redisClient,phoenixConn, "dim_base_category3", bean.getCategory3Id());
                 bean.setCategory3Name(c3.getString("NAME"));
                 bean.setCategory2Id(c3.getString("CATEGORY2_ID"));
                 
                 // 5. c2
-                JSONObject c2 = DimUtil.readDimFromPhoenix(phoenixConn, "dim_base_category2", bean.getCategory2Id());
+                JSONObject c2 = DimUtil.readDim(redisClient,phoenixConn, "dim_base_category2", bean.getCategory2Id());
                 bean.setCategory2Name(c2.getString("NAME"));
                 bean.setCategory1Id(c2.getString("CATEGORY1_ID"));
                 
                 // 6. c1
-                JSONObject c1 = DimUtil.readDimFromPhoenix(phoenixConn, "dim_base_category1", bean.getCategory1Id());
+                JSONObject c1 = DimUtil.readDim(redisClient,phoenixConn, "dim_base_category1", bean.getCategory1Id());
                 bean.setCategory1Name(c1.getString("NAME"));
                 
                 
+                phoenixConn.close();  // 归还给连接池
                 return bean;
             }
         });
