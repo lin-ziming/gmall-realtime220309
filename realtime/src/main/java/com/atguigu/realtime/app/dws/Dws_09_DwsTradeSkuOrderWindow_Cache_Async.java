@@ -254,7 +254,8 @@ public class Dws_09_DwsTradeSkuOrderWindow_Cache_Async extends BaseAppV1 {
                         bean.setStt(AtguiguUtil.toDateTime(ctx.window().getStart()));
                         bean.setEdt(AtguiguUtil.toDateTime(ctx.window().getEnd()));
                         
-                        bean.setCurDate(AtguiguUtil.toDate(System.currentTimeMillis()));
+//                        bean.setCurDate(AtguiguUtil.toDate(System.currentTimeMillis()));
+                        bean.setCurDate(AtguiguUtil.toDate(ctx.window().getStart()));  //
                         
                         out.collect(bean);
                     }
