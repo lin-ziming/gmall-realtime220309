@@ -6,6 +6,7 @@ import com.atguigu.realtime.sugar.bean.Traffic;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 public interface TradeService {
     BigDecimal gmv(int date);
@@ -17,4 +18,6 @@ public interface TradeService {
     List<Tm> gmvByTm(int date);
     
     List<Traffic> statsTraffic(int date);
+    
+    List<Map<String, Object>> kw(int date);
 }

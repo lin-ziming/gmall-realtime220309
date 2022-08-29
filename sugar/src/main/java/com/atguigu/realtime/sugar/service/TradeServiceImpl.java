@@ -9,6 +9,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @Author lzc
@@ -37,6 +38,11 @@ public class TradeServiceImpl implements TradeService {
     @Override
     public List<Traffic> statsTraffic(int date) {
         return tradeMapper.statsTraffic(date);
+    }
+    
+    @Override
+    public List<Map<String, Object>> kw(int date) {
+        return tradeMapper.kw(date);
     }
     
 }

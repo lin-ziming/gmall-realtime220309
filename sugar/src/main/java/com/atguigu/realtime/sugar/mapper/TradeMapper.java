@@ -7,6 +7,7 @@ import org.apache.ibatis.annotations.Select;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 
 /**
  * @Author lzc
@@ -42,6 +43,17 @@ public interface TradeMapper {
         "from dws_traffic_vc_ch_ar_is_new_page_view_window partition(par#{date}) " +
         "group by hour(stt);")
     List<Traffic> statsTraffic(int date);
+    
+    
+    
+    @Select("select keyword, " +
+        "sum(keyword_count * case source when 'search' then 10 when 'order' then 8 else 6 end) score " +
+        "from dws_traffic_source_keyword_page_view_window partition(par20220829) " +
+        "group by keyword;")
+    List<Map<String, Object>> kw(int date);
+    
+    
+    
 }
 
 /*

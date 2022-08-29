@@ -153,12 +153,40 @@ public class SugarController {
         
         
         for (int hour = 0; hour < 24; hour++) {
-            // 根据key'获取value, 如果key不存, 则返回默认值
+            // 根据key'获取value, 如果key不存在, 则返回默认值
             Traffic traffic = hourAndTrafficMap.getOrDefault(hour, new Traffic(hour, 0L, 0L, 0L));
             pvData.add(traffic.getPv());
             uvData.add(traffic.getUv());
             svData.add(traffic.getSv());
         }
+        result.put("data", data);
+        
+        return result.toJSONString();
+    }
+    
+    
+    @RequestMapping("/sugar/kw")
+    public String kw(int date) {
+        
+        List<Map<String, Object>> list = tradeService.kw(date);
+        
+        JSONObject result = new JSONObject();
+        result.put("status", 0);
+        result.put("msg", "");
+        
+        JSONArray data = new JSONArray();
+        
+        for (Map<String, Object> map : list) {
+            
+            JSONObject obj = new JSONObject();
+            obj.put("name", map.get("keyword"));
+            obj.put("value", map.get("score"));
+            
+            data.add(obj);
+            
+        }
+        
+        
         result.put("data", data);
         
         return result.toJSONString();
